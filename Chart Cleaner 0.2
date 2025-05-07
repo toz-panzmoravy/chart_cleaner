@@ -1,0 +1,113 @@
+//+------------------------------------------------------------------+
+//|                                                  Cleaner 0.1.mq5 |
+//|                                                       Panzmoravy |
+//|                                https://github.com/toz-panzmoravy |
+//+------------------------------------------------------------------+
+#property copyright "Panzmoravy"
+#property link      "https://github.com/toz-panzmoravy"
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+
+#property indicator_chart_window
+#property indicator_buffers 1
+#property indicator_plots   1
+
+double dummyBuffer[];
+
+input int CandlesToKeep = 10;                // Kolik svíček ponechat
+string buttonName = "CleanerButton";         // Název tlačítka
+int buttonOffsetX = 110;                     // Posun od pravého okraje (px)
+int buttonOffsetY = 50;                      // Posun od horního okraje (px)
+int buttonWidth  = 80;
+
+int OnInit()
+{
+   SetIndexBuffer(0, dummyBuffer);
+   PlotIndexSetInteger(0, PLOT_DRAW_TYPE, DRAW_NONE);
+
+   CreateCleanerButton();
+   EventSetTimer(1); // Timer pro sledování změny velikosti okna
+   return INIT_SUCCEEDED;
+}
+
+void OnDeinit(const int reason)
+{
+   ObjectDelete(0, buttonName);
+   EventKillTimer();
+}
+
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
+{
+   return rates_total;
+}
+
+void OnChartEvent(const int id,
+                  const long &lparam,
+                  const double &dparam,
+                  const string &sparam)
+{
+   if (id == CHARTEVENT_OBJECT_CLICK && sparam == buttonName)
+   {
+      CleanOldObjects();
+   }
+}
+
+void OnTimer()
+{
+   long chartWidth = ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+   int xDistance = (int)(chartWidth - buttonOffsetX);
+
+   ObjectSetInteger(0, buttonName, OBJPROP_XDISTANCE, xDistance);
+   ObjectSetInteger(0, buttonName, OBJPROP_YDISTANCE, buttonOffsetY);
+}
+
+void CreateCleanerButton()
+{
+   if (!ObjectCreate(0, buttonName, OBJ_BUTTON, 0, 0, 0))
+      return;
+
+   ObjectSetInteger(0, buttonName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, buttonName, OBJPROP_XDISTANCE, 1000); // bude přepočteno v OnTimer
+   ObjectSetInteger(0, buttonName, OBJPROP_YDISTANCE, buttonOffsetY);
+   ObjectSetInteger(0, buttonName, OBJPROP_WIDTH, buttonWidth);
+   ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 10);
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Cleaner");
+   ObjectSetInteger(0, buttonName, OBJPROP_HIDDEN, true);
+   ObjectSetInteger(0, buttonName, OBJPROP_SELECTABLE, false);
+
+   OnTimer(); // okamžité nastavení pozice
+}
+
+void CleanOldObjects()
+{
+   datetime cutoffTime = iTime(_Symbol, _Period, CandlesToKeep);
+   int total = ObjectsTotal(0);
+
+   for (int i = total - 1; i >= 0; i--)
+   {
+      string name = ObjectName(0, i);
+      if (name == buttonName)
+         continue; // nepoužívat pro tlačítko!
+
+      datetime objTime = 0;
+
+      if (ObjectGetInteger(0, name, OBJPROP_TIME, objTime))
+      {
+         if (objTime < cutoffTime)
+            ObjectDelete(0, name);
+      }
+      else
+      {
+         ObjectDelete(0, name); // pokud není čas, ale není to tlačítko
+      }
+   }
+}
